@@ -22,6 +22,10 @@ let isCaptchaVerified = false;
 let quickViewTarget = null;
 let qvQuantity = 1;
 let currentEditingImageBase64 = '';
+// Variables para paginación y búsqueda del panel Admin
+let adminCurrentPage = 1;
+const adminItemsPerPage = 8; // Puedes cambiar la cantidad de productos por página aquí
+let adminSearchQuery = '';
 
 // Cargar catálogo desde Supabase
 async function fetchProductsFromCloud() {
@@ -959,16 +963,63 @@ function resetProductForm() {
   document.getElementById('saveProductBtn').innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i> Guardar Producto';
 }
 
+// Maneja la búsqueda en tiempo real dentro del panel
+function handleAdminSearch(query) {
+  adminSearchQuery = query.toLowerCase().trim();
+  adminCurrentPage = 1; // Reinicia a la primera página al filtrar
+  renderAdminProductsTable();
+}
+
+// Cambia de página
+function changeAdminPage(newPage) {
+  adminCurrentPage = newPage;
+  renderAdminProductsTable();
+}
+
+// Renderizado de tabla con filtro y paginación
 function renderAdminProductsTable() {
   const tbody = document.getElementById('adminProductsTableBody');
-  document.getElementById('adminTotalProdCount').textContent = products.length;
+  const countEl = document.getElementById('adminTotalProdCount');
+  const infoEl = document.getElementById('adminPaginationInfo');
+  const buttonsEl = document.getElementById('adminPaginationButtons');
 
-  if (products.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No hay productos registrados.</td></tr>`;
+  if (!tbody) return;
+
+  // 1. Filtrar productos según el buscador
+  const filtered = products.filter(p => {
+    const nameMatch = p.name ? p.name.toLowerCase().includes(adminSearchQuery) : false;
+    const catMatch = p.category ? p.category.toLowerCase().includes(adminSearchQuery) : false;
+    return nameMatch || catMatch;
+  });
+
+  if (countEl) countEl.textContent = products.length;
+
+  // 2. Si no hay productos registrados o coincidentes
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="p-6 text-center text-slate-400">
+          <i class="fa-solid fa-box-open text-2xl mb-1 text-slate-300 block"></i>
+          ${products.length === 0 ? 'No hay productos registrados en el catálogo.' : 'No se encontraron productos coincidentes.'}
+        </td>
+      </tr>
+    `;
+    if (infoEl) infoEl.textContent = 'Mostrando 0 de 0 productos';
+    if (buttonsEl) buttonsEl.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = products.map(p => `
+  // 3. Cálculo de Paginación
+  const totalPages = Math.ceil(filtered.length / adminItemsPerPage);
+  if (adminCurrentPage > totalPages) adminCurrentPage = totalPages;
+  if (adminCurrentPage < 1) adminCurrentPage = 1;
+
+  const startIndex = (adminCurrentPage - 1) * adminItemsPerPage;
+  const endIndex = Math.min(startIndex + adminItemsPerPage, filtered.length);
+  const currentProducts = filtered.slice(startIndex, endIndex);
+
+  // 4. Renderizar Filas de la Página Actual
+  tbody.innerHTML = currentProducts.map(p => `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3">
         <img src="${p.image}" alt="${p.name}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" onerror="this.src='https://placehold.co/80x80/f1f5f9/0f172a?text=Foto'">
@@ -985,15 +1036,62 @@ function renderAdminProductsTable() {
         ${p.badge ? `<span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">${p.badge}</span>` : '<span class="text-slate-300">-</span>'}
       </td>
       <td class="p-3 text-right space-x-1">
-        <button onclick="editProduct('${p.id}')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+        <button onclick="editProduct('${p.id}')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
           <i class="fa-solid fa-pen-to-square"></i>
         </button>
-        <button onclick="deleteProduct('${p.id}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Eliminar">
+        <button onclick="deleteProduct('${p.id}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
           <i class="fa-solid fa-trash"></i>
         </button>
       </td>
     </tr>
   `).join('');
+
+  // 5. Actualizar Texto Informativo
+  if (infoEl) {
+    infoEl.textContent = `Mostrando ${startIndex + 1} a ${endIndex} de ${filtered.length} productos`;
+  }
+
+  // 6. Generar Botones de Paginación
+  if (buttonsEl) {
+    let btnHtml = '';
+
+    // Botón Anterior
+    btnHtml += `
+      <button 
+        onclick="changeAdminPage(${adminCurrentPage - 1})" 
+        ${adminCurrentPage === 1 ? 'disabled' : ''} 
+        class="px-2.5 py-1 text-xs rounded-lg border border-slate-200 font-medium ${adminCurrentPage === 1 ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-white hover:bg-slate-100 text-slate-700 shadow-sm'}"
+      >
+        <i class="fa-solid fa-chevron-left text-[10px]"></i>
+      </button>
+    `;
+
+    // Botones numéricos
+    for (let i = 1; i <= totalPages; i++) {
+      const isCurrent = i === adminCurrentPage;
+      btnHtml += `
+        <button 
+          onclick="changeAdminPage(${i})" 
+          class="w-7 h-7 text-xs font-bold rounded-lg transition-all ${isCurrent ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}"
+        >
+          ${i}
+        </button>
+      `;
+    }
+
+    // Botón Siguiente
+    btnHtml += `
+      <button 
+        onclick="changeAdminPage(${adminCurrentPage + 1})" 
+        ${adminCurrentPage === totalPages ? 'disabled' : ''} 
+        class="px-2.5 py-1 text-xs rounded-lg border border-slate-200 font-medium ${adminCurrentPage === totalPages ? 'opacity-40 cursor-not-allowed bg-slate-100 text-slate-400' : 'bg-white hover:bg-slate-100 text-slate-700 shadow-sm'}"
+      >
+        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+      </button>
+    `;
+
+    buttonsEl.innerHTML = btnHtml;
+  }
 }
 
 // Guardar ajustes de la tienda y producto destacado
