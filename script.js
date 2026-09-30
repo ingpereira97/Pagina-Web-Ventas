@@ -501,7 +501,7 @@ function renderProducts() {
                   <span class="text-xs font-semibold text-slate-400 line-through">${formatCurrency(product.oldPrice)}</span>
                 ` : ''}
               </div>
-              <span class="text-[10px] text-emerald-600 font-semibold block">Listo para entrega</span>
+              <span class="text-[10px] text-emerald-600 font-semibold block">Por Pedido</span>
             </div>
 
             <button onclick="addToCart('${product.id}')" class="bg-slate-900 hover:bg-emerald-600 text-white font-bold text-xs p-3 sm:px-3.5 sm:py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 group-hover:bg-emerald-600" title="Agregar al presupuesto">
