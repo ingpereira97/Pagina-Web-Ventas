@@ -710,6 +710,9 @@
         <button id="tabBtnProducts" onclick="switchAdminTab('products')" class="px-4 py-2.5 font-bold text-xs border-b-2 border-emerald-600 text-emerald-700">
           <i class="fa-solid fa-box mr-1.5"></i> Productos
         </button>
+        <button id="tabBtnCategories" onclick="switchAdminTab('categories')" class="px-4 py-2.5 font-bold text-xs border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+          <i class="fa-solid fa-layer-group mr-1.5"></i> Categorías
+        </button>
         <button id="tabBtnSettings" onclick="switchAdminTab('settings')" class="px-4 py-2.5 font-bold text-xs border-b-2 border-transparent text-slate-500 hover:text-slate-800">
           <i class="fa-solid fa-gear mr-1.5"></i> Configuración
         </button>
@@ -738,8 +741,16 @@
                 <input type="text" id="formProdName" required placeholder="Ej: Zapatillas Urban Pro" class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-slate-700 mb-1">Categoría *</label>
-                <input type="text" id="formProdCategory" required placeholder="Ej: Calzado, Hogar, Tecnología..." class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-[11px] font-bold text-slate-700">Categoría *</label>
+                  <button type="button" onclick="switchAdminTab('categories')" class="text-[10px] text-emerald-600 hover:underline font-semibold">
+                    + Gestionar
+                  </button>
+                </div>
+                <select id="formProdCategory" required class="w-full bg-white border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500">
+                  <option value="">-- Seleccionar categoría --</option>
+                  <!-- Se llena dinámicamente -->
+                </select>
               </div>
             </div>
 
@@ -862,7 +873,43 @@
           </div>
         </div>
       </div>
+      <!-- ========================================================
+           TAB NUEVO: GESTIÓN DE CATEGORÍAS
+           ======================================================== -->
+      <div id="tabContentCategories" class="hidden p-6 space-y-6" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+        
+        <!-- Formulario para agregar categoría -->
+        <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200 max-w-lg">
+          <h4 class="text-sm font-extrabold text-slate-900 mb-3 flex items-center gap-1.5">
+            <i class="fa-solid fa-folder-plus text-emerald-600"></i> Nueva Categoría
+          </h4>
+          <form onsubmit="handleCreateCategory(event)" class="flex gap-2">
+            <input 
+              type="text" 
+              id="newCategoryName" 
+              required 
+              placeholder="Ej: Auriculares, Calzado, Hogar..." 
+              class="flex-1 bg-white border border-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
+            >
+            <button type="submit" id="saveCatBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Agregar
+            </button>
+          </form>
+        </div>
 
+        <!-- Lista de categorías existentes -->
+        <div class="max-w-lg">
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+            Categorías Activas (<span id="catTotalCount">0</span>)
+          </h4>
+          <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <ul id="adminCategoriesList" class="divide-y divide-slate-100 text-xs">
+              <!-- Se genera dinámicamente -->
+            </ul>
+          </div>
+        </div>
+
+      </div>
       <!-- Tab 2: Store Settings (TAMBIÉN CON SCROLL) -->
       <div id="tabContentSettings" class="hidden p-6 space-y-6" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
         <form id="storeSettingsForm" class="max-w-xl space-y-4">

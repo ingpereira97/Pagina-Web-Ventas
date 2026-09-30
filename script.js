@@ -12,6 +12,7 @@ const DEFAULT_CONFIG = {
 }; 
 
 // Variables de estado
+let storeCategories = [];
 let storeConfig = JSON.parse(localStorage.getItem('aura_store_config')) || DEFAULT_CONFIG;
 let products = [];
 let cart = JSON.parse(localStorage.getItem('aura_cart')) || [];
@@ -786,21 +787,29 @@ async function handleAdminLogout() {
 }
 
 function switchAdminTab(tab) {
-  const tabBtnProducts = document.getElementById('tabBtnProducts');
-  const tabBtnSettings = document.getElementById('tabBtnSettings');
-  const tabContentProducts = document.getElementById('tabContentProducts');
-  const tabContentSettings = document.getElementById('tabContentSettings');
+  const tabs = {
+    products: { btn: 'tabBtnProducts', content: 'tabContentProducts' },
+    categories: { btn: 'tabBtnCategories', content: 'tabContentCategories' },
+    settings: { btn: 'tabBtnSettings', content: 'tabContentSettings' }
+  };
 
-  if (tab === 'products') {
-    tabBtnProducts.className = 'px-4 py-2.5 font-bold text-xs border-b-2 border-emerald-600 text-emerald-700';
-    tabBtnSettings.className = 'px-4 py-2.5 font-bold text-xs border-b-2 border-transparent text-slate-500 hover:text-slate-800';
-    tabContentProducts.classList.remove('hidden');
-    tabContentSettings.classList.add('hidden');
-  } else {
-    tabBtnSettings.className = 'px-4 py-2.5 font-bold text-xs border-b-2 border-emerald-600 text-emerald-700';
-    tabBtnProducts.className = 'px-4 py-2.5 font-bold text-xs border-b-2 border-transparent text-slate-500 hover:text-slate-800';
-    tabContentSettings.classList.remove('hidden');
-    tabContentProducts.classList.add('hidden');
+  Object.keys(tabs).forEach(key => {
+    const btn = document.getElementById(tabs[key].btn);
+    const content = document.getElementById(tabs[key].content);
+
+    if (key === tab) {
+      btn?.classList.add('border-emerald-600', 'text-emerald-700');
+      btn?.classList.remove('border-transparent', 'text-slate-500');
+      content?.classList.remove('hidden');
+    } else {
+      btn?.classList.remove('border-emerald-600', 'text-emerald-700');
+      btn?.classList.add('border-transparent', 'text-slate-500');
+      content?.classList.add('hidden');
+    }
+  });
+
+  if (tab === 'categories') {
+    renderCategoriesAdmin();
   }
 }
 
@@ -1267,6 +1276,127 @@ function restoreDefaultProducts() {
   showToast('Para agregar productos usa el formulario superior.', 'info');
 }
 
+// Cargar categorías desde Supabase
+async function fetchCategoriesFromCloud() {
+  try {
+    const { data, error } = await _supabase
+      .from('categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    storeCategories = data || [];
+
+    renderCategoriesAdmin();
+    populateProductCategorySelect();
+    renderCategories(); // Actualiza las burbujas de filtros de la tienda
+  } catch (err) {
+    console.error('Error al cargar categorías:', err);
+  }
+}
+
+// Llenar el <select> del formulario de productos
+function populateProductCategorySelect() {
+  const select = document.getElementById('formProdCategory');
+  if (!select) return;
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- Seleccionar categoría --</option>' + 
+    storeCategories.map(cat => `
+      <option value="${cat.name}">${cat.name}</option>
+    `).join('');
+
+  if (currentVal) select.value = currentVal;
+}
+
+// Renderizar la lista dentro del panel de administración
+function renderCategoriesAdmin() {
+  const list = document.getElementById('adminCategoriesList');
+  const countEl = document.getElementById('catTotalCount');
+  if (countEl) countEl.textContent = storeCategories.length;
+  if (!list) return;
+
+  if (storeCategories.length === 0) {
+    list.innerHTML = `<li class="p-4 text-center text-slate-400">No hay categorías registradas.</li>`;
+    return;
+  }
+
+  list.innerHTML = storeCategories.map(cat => {
+    // Cuenta cuántos productos usan esta categoría
+    const prodCount = products.filter(p => p.category?.toLowerCase() === cat.name.toLowerCase()).length;
+
+    return `
+      <li class="flex items-center justify-between p-3.5 hover:bg-slate-50 transition-colors">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-tag text-emerald-600 text-xs"></i>
+          <span class="font-bold text-slate-800">${cat.name}</span>
+          <span class="text-[10px] text-slate-400">(${prodCount} productos)</span>
+        </div>
+        <button onclick="deleteCategory('${cat.id}', '${cat.name}', ${prodCount})" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg transition-colors" title="Eliminar categoría">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </li>
+    `;
+  }).join('');
+}
+
+// Crear nueva categoría
+async function handleCreateCategory(e) {
+  e.preventDefault();
+  const input = document.getElementById('newCategoryName');
+  const name = input.value.trim();
+  const saveBtn = document.getElementById('saveCatBtn');
+
+  if (!name) return;
+
+  // Evita duplicados en cliente
+  const exists = storeCategories.some(c => c.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    showToast('Esta categoría ya existe', 'error');
+    return;
+  }
+
+  saveBtn.disabled = true;
+  try {
+    const { error } = await _supabase.from('categories').insert([{ name }]);
+    if (error) throw error;
+
+    input.value = '';
+    showToast(`Categoría "${name}" agregada`);
+    await fetchCategoriesFromCloud();
+  } catch (err) {
+    console.error(err);
+    showToast('Error al guardar categoría', 'error');
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+// Eliminar categoría
+function deleteCategory(catId, catName, prodCount) {
+  if (prodCount > 0) {
+    showToast(`No puedes eliminar "${catName}" porque tiene ${prodCount} producto(s) asignado(s).`, 'error');
+    return;
+  }
+
+  showConfirmDialog({
+    title: 'Eliminar Categoría',
+    message: `¿Estás seguro de eliminar la categoría "${catName}"?`,
+    onConfirm: async () => {
+      try {
+        const { error } = await _supabase.from('categories').delete().eq('id', catId);
+        if (error) throw error;
+
+        showToast(`Categoría "${catName}" eliminada`);
+        await fetchCategoriesFromCloud();
+      } catch (err) {
+        console.error(err);
+        showToast('Error al eliminar categoría', 'error');
+      }
+    }
+  });
+}
+
 // Inicialización
 window.addEventListener('DOMContentLoaded', () => {
   applyStoreConfigUI();
@@ -1275,5 +1405,6 @@ window.addEventListener('DOMContentLoaded', () => {
   updateCartUI();
   fetchStoreConfigFromCloud();
   fetchProductsFromCloud();
+  fetchCategoriesFromCloud();
   checkAdminUrlAccess();
 });
